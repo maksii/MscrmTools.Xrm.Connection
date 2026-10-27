@@ -590,7 +590,20 @@ namespace McTools.Xrm.Connection
             else if (!string.IsNullOrEmpty(ConnectionString))
             {
                 var cs = HandleConnectionString(ConnectionString);
-                crmSvc = new CrmServiceClient(cs);
+                var csb = new DbConnectionStringBuilder { ConnectionString = cs };
+
+                // A client secret connection naming its own Authority gets its tokens from that authority: the
+                // connector only accepts authorities validated by Microsoft Entra ID
+                if (csb.ContainsKey("Authority") && csb.ContainsKey("AuthType") && csb["AuthType"].ToString().Equals("ClientSecret", StringComparison.OrdinalIgnoreCase))
+                {
+                    CrmServiceClient.AuthOverrideHook = new ClientCredentialsAuthOverride(csb);
+                    crmSvc = new CrmServiceClient(new Uri(OriginalUrl), true);
+                    CrmServiceClient.AuthOverrideHook = null;
+                }
+                else
+                {
+                    crmSvc = new CrmServiceClient(cs);
+                }
             }
             else if (!String.IsNullOrEmpty(AzureKeyVaultName))
             {
